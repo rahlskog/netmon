@@ -2,7 +2,6 @@
 #include <fstream>
 #include <stdint.h>
 #include <time.h>
-#include <sqlite3.h>
 
 using std::cout;
 using std::endl;
@@ -19,15 +18,14 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 	
+	std::ifstream ifile(std::string("/sys/class/net/")+argv[1]);
+	if (!ifile)
 	{
-		std::ifstream ifile(std::string("/sys/class/net/")+argv[1]);
-		if (!ifile)
-		{
-			cout << "Interface \"" << argv[1] << "\" not found" << endl;
-			Usage(argv[0]);
-			return -1;
-		}
+		cout << "Interface \"" << argv[1] << "\" not found" << endl;
+		Usage(argv[0]);
+		return -1;
 	}
+	ifile.close();
 	
 	return MainLoop(argv[1]);
 }
@@ -40,11 +38,20 @@ int MainLoop(std::string interface) {
 	std::string RX("/sys/class/net/"+interface+"/statistics/rx_bytes");
 	std::string TX("/sys/class/net/"+interface+"/statistics/tx_bytes");
 	
+	std::ifstream ifile(interface+".log");
+	if (!ifile)
+	{
+		std::ofstream ofile(interface+".log");
+		ofile << "#timestamp,time-delta,rx-delta,tx-delta" << endl;
+	}
+	ifile.close();
+	
+	
 	uint64_t rx_last, rx_now;
 	uint64_t tx_last, tx_now;
-	timespec now;
-	timespec wait;
-	timespec remain;
+	timespec now{0,0};
+	timespec wait{0,0};
+	timespec remain{0,0};
 	
 	if (!(GetBytes(RX, rx_last) && GetBytes(TX, tx_last))) {
 		cout << "Failed reading initial values" << endl;
