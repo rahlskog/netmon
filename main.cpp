@@ -3,14 +3,14 @@
 #include <stdint.h>
 #include <time.h>
 #include "interfaces.h"
-
+#include "builtins.h"
 using std::cout;
 using std::endl;
 
 const int run_interval = 60;
 
 void Usage(std::string name);
-int MainLoop(Interface& interface);
+int MainLoop(StatReader& iface, LogWriter& log);
 
 int main(int argc, char **argv) {
 	if (argc < 2) {
@@ -19,8 +19,9 @@ int main(int argc, char **argv) {
 	}
 	
 	try {
-		SysfsInterface interface(argv[1]);
-		return MainLoop(interface);
+		FileWriter log;
+		SysfsReader interface(argv[1]);
+		return MainLoop(interface, log);
 	}
 	catch (InterfaceException e) {
 		cout << "Error: " << e.what() << endl;
@@ -33,20 +34,14 @@ void Usage(std::string name) {
 	cout << "Usage:\n  " << name << " [interface]\n" << endl;
 }
 
-int MainLoop(Interface& interface) {
-	std::ifstream ifile(interface.IfName()+".log");
-	if (!ifile)
-	{
-		std::ofstream ofile(interface.IfName()+".log");
-		ofile << "#timestamp,time-delta,rx-delta,tx-delta" << endl;
-	}
-	ifile.close();
-	
+int MainLoop(StatReader& iface, LogWriter& log) {
+	LogPackage lp;
+	lp.IfName = iface.IfName();
 	timespec now{0,0};
 	timespec wait{0,0};
 	timespec remain{0,0};
 	
-	if (!interface.Update()) {
+	if (!iface.Update()) {
 		cout << "Failed reading initial values" << endl;
 		return -1;
 	}
@@ -63,17 +58,16 @@ int MainLoop(Interface& interface) {
 		}
 		clock_gettime(CLOCK_REALTIME, &now);
 
-		if (!interface.Update()) {
+		if (!iface.Update()) {
 			cout << "Failed reading current valuies" << endl;
 			return -1;
 		}
 		
-		std::ofstream log(interface.IfName()+".log", std::ios::app);
-		
-		log << now.tv_sec << "," << wait.tv_sec << ",";
-		log << interface.RxDelta() << "," << interface.TxDelta() << endl;
-		
-		log.close();
+		lp.Time = now.tv_sec;
+		lp.TimeDelta = wait.tv_sec;
+		lp.RxDelta = iface.RxDelta();
+		lp.TxDelta = iface.TxDelta();
+		log.Log(lp);
 		
 		wait.tv_sec = run_interval - (now.tv_sec%run_interval);
 	}
