@@ -1,3 +1,9 @@
+/*
+ * Copyright (C) 2013 Robert Ahlskog.
+ * 
+ * This file is part of netmon, distributed under GNU GPL v3.
+ * For full terms see included LICENSE file.
+ */
 #ifndef INTERFACES_H
 #define INTERFACES_H
 #include <stdexcept>
